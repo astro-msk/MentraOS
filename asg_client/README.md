@@ -86,6 +86,30 @@ Implications for development:
    git submodule update --init StreamPackLite
    ```
 
+#### Optional direct Cally WebSocket POC
+
+The direct WiFi sidecar is disabled by default and runs alongside the existing phone/BES path.
+To enable its diagnostic-only `hello`/heartbeat/`ping`/`pong`/status protocol, add:
+
+```
+CALLY_DIRECT_MODE=enabled
+CALLY_DIRECT_URL=wss://your-cally-host/v1/glasses/connect
+CALLY_DIRECT_CF_ACCESS_CLIENT_ID=<Cloudflare Access service-token client ID>
+CALLY_DIRECT_CF_ACCESS_CLIENT_SECRET=<Cloudflare Access service-token client secret>
+```
+
+The Cloudflare values are sent as `CF-Access-Client-Id` and `CF-Access-Client-Secret` on every
+WebSocket upgrade. Both must be configured together. For a local server without Cloudflare Access,
+`CALLY_DIRECT_DEVICE_TOKEN` remains available as a temporary development fallback; it is optional
+when the Cloudflare pair is present, and both authentication layers are sent when all three values
+are configured.
+
+Production-style builds require `wss://`. A local debug build can use `ws://` only when
+`CALLY_DIRECT_ALLOW_CLEARTEXT_DEBUG=true`. BuildConfig credentials can be extracted from an APK, so
+use a scoped, revocable service token and do not commit `.env` or real credentials. See
+[Cally hybrid connectivity](docs/cally-hybrid-connectivity.md) for the transport map, limitations,
+and later source-aware routing plan.
+
 ### Development on Mentra Live
 
 Mentra Live ships with `com.mentra.asg_client` as a **system app** signed with Mentra's release key. To run your own build, `./scripts/dev-setup.sh` installs a fork alongside it under a separate package (`com.mentra.asg_client.thirdparty`), disables the stock app, and makes your build the default launcher; `./scripts/restore-stock.sh` reverses this.

@@ -6,6 +6,7 @@ Android application that runs on Mentra Live smart glasses, bridging hardware an
 
 - [Mentra Live product and platform spec](mentra-live-spec.md) — required reference for Mentra Live behavior when working in `asg_client`
 - [Overview](overview.md) — architecture, K900/Mentra Live naming, key components
+- [Cally hybrid connectivity](cally-hybrid-connectivity.md) — direct Wi-Fi plus iPhone/Mentra SDK architecture, source map, and first-POC plan
 - [Top-level README](../README.md) — environment setup, ADB (USB + WiFi), building and installing your fork
 
 ## API reference

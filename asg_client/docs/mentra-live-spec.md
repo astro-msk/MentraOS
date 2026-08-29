@@ -36,6 +36,16 @@ Mentra Live hardware
 
 The glasses do not directly run third-party MentraOS apps. Instead, `asg_client` reports device events and media state to the phone; the phone/cloud route those events to apps and route commands back to the glasses.
 
+An optional direct control plane may also connect `asg_client` to an explicitly configured,
+authenticated application server over WiFi. This route augments rather than replaces the phone
+route: the BES UART remains active for hardware ownership and phone relay, while a separate MTK
+Android transport provides a lower-latency server path when it is authenticated and healthy. When
+the direct route is unavailable, the phone/Mentra SDK path remains usable. Commands and responses
+must be source-aware so dual connectivity cannot duplicate user actions or send a reply through the
+wrong route. A Cloudflare Access service-token pair may authenticate the WebSocket upgrade at the
+edge; both header values are required together and must never be logged. The temporary
+`X-Cally-Device-Token` path remains a development fallback rather than a production device identity.
+
 ## Hardware and firmware architecture
 
 ### MTK Android side

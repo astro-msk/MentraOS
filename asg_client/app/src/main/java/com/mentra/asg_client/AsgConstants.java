@@ -1,6 +1,70 @@
 package com.mentra.asg_client;
 
 public class AsgConstants {
+    /** Application protocol version used by the direct Cally WebSocket sidecar. */
+    public static final int DIRECT_SERVER_PROTOCOL_VERSION = 1;
+
+    /** Interval between direct Cally application-level heartbeat messages. */
+    public static final long DIRECT_SERVER_HEARTBEAT_INTERVAL_MS = 15_000L;
+
+    /** OkHttp WebSocket ping interval used to detect half-open direct connections. */
+    public static final long DIRECT_SERVER_PING_INTERVAL_MS = 20_000L;
+
+    /** Maximum time allowed to establish the direct Cally TCP/TLS connection. */
+    public static final long DIRECT_SERVER_CONNECT_TIMEOUT_MS = 10_000L;
+
+    /** Maximum time to wait for Cally to acknowledge the direct protocol hello. */
+    public static final long DIRECT_SERVER_HELLO_ACK_TIMEOUT_MS = 10_000L;
+
+    /** First retry delay after a direct Cally connection attempt fails. */
+    public static final long DIRECT_SERVER_RECONNECT_INITIAL_DELAY_MS = 1_000L;
+
+    /** Maximum delay between repeated direct Cally connection attempts. */
+    public static final long DIRECT_SERVER_RECONNECT_MAX_DELAY_MS = 30_000L;
+
+    /** Fractional reconnect jitter applied above or below each exponential base delay. */
+    public static final double DIRECT_SERVER_RECONNECT_JITTER_FRACTION = 0.2d;
+
+    /** Largest inbound direct-control message accepted by the first POC. */
+    public static final int DIRECT_SERVER_MAX_MESSAGE_BYTES = 16 * 1024;
+
+    /** Largest correlation identifier accepted from the direct Cally endpoint. */
+    public static final int DIRECT_SERVER_MAX_REQUEST_ID_CHARS = 128;
+
+    /** Maximum product/install identity length accepted by the direct Cally protocol. */
+    public static final int DIRECT_SERVER_MAX_DEVICE_ID_CHARS = 128;
+
+    /** Maximum device-model, app-version, and SSID length in direct protocol payloads. */
+    public static final int DIRECT_SERVER_MAX_GENERAL_TEXT_CHARS = 128;
+
+    /** Maximum Android-version and local-address length in direct protocol payloads. */
+    public static final int DIRECT_SERVER_MAX_SHORT_TEXT_CHARS = 64;
+
+    /** Maximum inbound direct-control messages accepted during one rate-limit window. */
+    public static final int DIRECT_SERVER_MAX_MESSAGES_PER_WINDOW = 30;
+
+    /** Sliding-window duration used to cap direct-control message bursts. */
+    public static final long DIRECT_SERVER_MESSAGE_RATE_WINDOW_MS = 10_000L;
+
+    /** Header carrying the temporary per-device credential for the first direct Cally POC. */
+    public static final String DIRECT_SERVER_DEVICE_TOKEN_HEADER = "X-Cally-Device-Token";
+
+    /** Cloudflare Access service-token client identifier header. */
+    public static final String DIRECT_SERVER_CF_ACCESS_CLIENT_ID_HEADER = "CF-Access-Client-Id";
+
+    /** Cloudflare Access service-token client secret header. */
+    public static final String DIRECT_SERVER_CF_ACCESS_CLIENT_SECRET_HEADER =
+            "CF-Access-Client-Secret";
+
+    /** Private preferences file holding the generated direct-server install identity fallback. */
+    public static final String DIRECT_SERVER_PREFERENCES = "cally_direct_server";
+
+    /** Preference key for the generated direct-server install identity fallback. */
+    public static final String DIRECT_SERVER_INSTALL_ID_KEY = "install_id";
+
+    /** RSSI reported when Android cannot expose a current Wi-Fi signal measurement. */
+    public static final int DIRECT_SERVER_UNKNOWN_WIFI_RSSI_DBM = -127;
+
     /** Mentra Live hotspot idle timeout after the last local HTTP activity. */
     public static final long HOTSPOT_INACTIVITY_TIMEOUT_MS = 120_000L;
 
@@ -207,8 +271,7 @@ public class AsgConstants {
     public static final String BES_OTA_PRODUCT = "best1502x_ibrt_bpone";
 
     /** Prefix for hash-addressed ADB-only artifacts, separate from phone-owned BES OTA data. */
-    public static final String DEBUG_BES_OTA_ARTIFACT_PREFIX =
-            "/storage/emulated/0/asg/debug_bes_";
+    public static final String DEBUG_BES_OTA_ARTIFACT_PREFIX = "/storage/emulated/0/asg/debug_bes_";
 
     /** Debug BES intent extra carrying the exact post-reboot firmware version. */
     public static final String DEBUG_BES_OTA_TARGET_VERSION_EXTRA = "target_version";
@@ -220,8 +283,7 @@ public class AsgConstants {
     public static final String DEBUG_BES_OTA_ARTIFACT_ID_EXTRA = "artifact_id";
 
     /** ADB/local command that reboots BES before handing MTK to a factory USB flasher. */
-    public static final String COMMAND_REBOOT_BES_FOR_MTK_FLASH =
-            "reboot_bes_for_mtk_flash";
+    public static final String COMMAND_REBOOT_BES_FOR_MTK_FLASH = "reboot_bes_for_mtk_flash";
 
     /** Correlation field used to prove that the requested BES reboot reached the UART worker. */
     public static final String MTK_FLASH_REQUEST_ID_FIELD = "request_id";
@@ -255,9 +317,9 @@ public class AsgConstants {
     public static final long UART_BOOT_RECOVERY_INITIAL_DELAY_MS = 8000;
 
     /**
-     * Grace after bounded UART recovery is exhausted before a BES OTA timeout becomes terminal.
-     * BES can finish rebooting after the transport scan, and an exact target-version reply from
-     * that later Linux boot is authoritative.
+     * Grace after bounded UART recovery is exhausted before a BES OTA timeout becomes terminal. BES
+     * can finish rebooting after the transport scan, and an exact target-version reply from that
+     * later Linux boot is authoritative.
      */
     public static final long BES_OTA_RECOVERY_FAILURE_GRACE_MS = 30000;
 
@@ -476,8 +538,8 @@ public class AsgConstants {
     public static final int BLE_PHOTO_MAX_TARGET_PX = 1920;
 
     /**
-     * Phone → glasses JSON command type to enable or disable Wi-Fi ADB (Mentra Live).
-     * Persisted via AsgSettings and applied at boot (default off).
+     * Phone → glasses JSON command type to enable or disable Wi-Fi ADB (Mentra Live). Persisted via
+     * AsgSettings and applied at boot (default off).
      */
     public static final String COMMAND_SET_WIFI_ADB_STATE = "set_wifi_adb_state";
 }

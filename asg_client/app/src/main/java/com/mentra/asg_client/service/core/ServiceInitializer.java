@@ -3,6 +3,9 @@ package com.mentra.asg_client.service.core;
 import android.util.Log;
 import androidx.annotation.NonNull;
 import com.mentra.asg_client.io.bluetooth.interfaces.ICompanionTransport;
+import com.mentra.asg_client.io.direct.DirectDeviceStatusProvider;
+import com.mentra.asg_client.io.direct.DirectServerConfig;
+import com.mentra.asg_client.io.direct.DirectWebSocketTransport;
 import com.mentra.asg_client.io.file.core.FileManager;
 import com.mentra.asg_client.io.hardware.interfaces.IHardwareManager;
 import com.mentra.asg_client.io.network.interfaces.INetworkManager;
@@ -63,6 +66,7 @@ public final class ServiceInitializer {
     private final AsgNotificationManager notificationManager;
     private final IResponseBuilder responseBuilder;
     private final ExecutorService batteryAnnouncementExecutor;
+    private final DirectWebSocketTransport directWebSocketTransport;
 
     public ServiceInitializer(
             @NonNull AsgClientService service,
@@ -82,12 +86,22 @@ public final class ServiceInitializer {
 
         this.serviceManager =
                 new AsgClientServiceManager(
-                        context, service, communicationManager, fileManager, besOtaRegistry,
-                        transport, network);
+                        context,
+                        service,
+                        communicationManager,
+                        fileManager,
+                        besOtaRegistry,
+                        transport,
+                        network);
         this.notificationManager = new AsgNotificationManager(context);
         this.configurationManager = new ConfigurationManager(context);
         this.stateManager = new StateManager(serviceManager);
         serviceManager.setStateManager(this.stateManager);
+        this.directWebSocketTransport =
+                new DirectWebSocketTransport(
+                        context,
+                        DirectServerConfig.fromBuildConfig(),
+                        new DirectDeviceStatusProvider(context, stateManager, network));
 
         this.streamingManager = new MediaManager(context, serviceManager);
         this.batteryAnnouncementExecutor =
@@ -116,7 +130,8 @@ public final class ServiceInitializer {
                         stateManager,
                         batteryAnnouncementExecutor));
         peripheralBus.subscribe(new ShutdownEventSubscriber(serviceManager, context));
-        peripheralBus.subscribe(new FactoryResetEventSubscriber(serviceManager, context, otaHelper));
+        peripheralBus.subscribe(
+                new FactoryResetEventSubscriber(serviceManager, context, otaHelper));
         peripheralBus.subscribe(new BesVersionEventSubscriber(serviceManager));
         peripheralBus.subscribe(new BtMacEventSubscriber(serviceManager));
         peripheralBus.subscribe(new BesOtaAuthEventSubscriber(serviceManager));
@@ -150,11 +165,13 @@ public final class ServiceInitializer {
     public void initialize() {
         Log.d(TAG, "Initializing service graph");
         lifecycleManager.initialize();
+        directWebSocketTransport.start();
         Log.d(TAG, "Service graph initialized");
     }
 
     public void cleanup() {
         Log.d(TAG, "Cleaning up service graph");
+        directWebSocketTransport.stop();
         batteryAnnouncementExecutor.shutdownNow();
         try {
             if (!batteryAnnouncementExecutor.awaitTermination(
