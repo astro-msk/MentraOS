@@ -5,6 +5,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.os.PowerManager;
 import android.util.Log;
+import com.mentra.asg_client.io.direct.DirectPeripheralTester;
 
 import com.mentra.asg_client.audio.AudioAssets;
 import com.mentra.asg_client.utils.WakeLockManager;
@@ -33,6 +34,11 @@ import org.json.JSONObject;
  * Follows Open/Closed Principle by being extensible for new K900 commands.
  */
 public class K900CommandHandler {
+    private static volatile DirectPeripheralTester directPeripheralTester;
+
+    public static void setDirectPeripheralTester(DirectPeripheralTester tester) {
+        directPeripheralTester = tester;
+    }
     private static final String TAG = "K900CommandHandler";
 
     private final AsgClientServiceManager serviceManager;
@@ -808,6 +814,8 @@ public class K900CommandHandler {
      * Also enables BES touch/swipe event listening
      */
     private void handleConfigurableButtonPress(boolean isLongPress) {
+        DirectPeripheralTester tester = directPeripheralTester;
+        if (tester != null) tester.onButton(isLongPress);
         if (serviceManager != null && serviceManager.getAsgSettings() != null) {
             String pressType = isLongPress ? "long" : "short";
             Log.d(TAG, "Handling " + pressType + " button press");

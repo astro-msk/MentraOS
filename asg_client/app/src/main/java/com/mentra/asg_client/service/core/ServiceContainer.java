@@ -7,9 +7,18 @@ import androidx.annotation.NonNull;
 
 import com.mentra.asg_client.io.file.core.FileManager;
 import com.mentra.asg_client.io.file.core.FileManagerFactory;
+import com.mentra.asg_client.audio.AudioAssets;
+import com.mentra.asg_client.io.direct.DirectDeviceStatusProvider;
+import com.mentra.asg_client.io.direct.DirectPcmPlayer;
+import com.mentra.asg_client.io.direct.DirectPeripheralTester;
+import com.mentra.asg_client.io.direct.DirectServerConfig;
+import com.mentra.asg_client.io.direct.DirectWebSocketTransport;
+import com.mentra.asg_client.io.hardware.core.HardwareManagerFactory;
+import com.mentra.asg_client.io.hardware.interfaces.IHardwareManager;
 import com.mentra.asg_client.io.ota.helpers.OtaHelper;
 import com.mentra.asg_client.service.communication.interfaces.ICommunicationManager;
 import com.mentra.asg_client.service.core.handlers.OtaCommandHandler;
+import com.mentra.asg_client.service.core.handlers.K900CommandHandler;
 import com.mentra.asg_client.service.communication.interfaces.IResponseBuilder;
 import com.mentra.asg_client.service.communication.managers.CommunicationManager;
 import com.mentra.asg_client.service.communication.managers.ResponseBuilder;
@@ -47,6 +56,9 @@ public class ServiceContainer {
     private final IMediaManager streamingManager;
 
     private final FileManager fileManager;
+    private final DirectWebSocketTransport directWebSocketTransport;
+    private final DirectPeripheralTester directPeripheralTester;
+    private final DirectPcmPlayer directPcmPlayer;
 
     public ServiceContainer(Context context, @NonNull AsgClientService service) {
         this.context = context;
@@ -67,6 +79,22 @@ public class ServiceContainer {
 
         // Set StateManager in service manager for battery monitoring
         serviceManager.setStateManager(this.stateManager);
+
+        IHardwareManager hardwareManager = HardwareManagerFactory.getInstance(context);
+        this.directWebSocketTransport = new DirectWebSocketTransport(
+                context,
+                DirectServerConfig.fromBuildConfig(),
+                new DirectDeviceStatusProvider(context, stateManager, serviceManager.getNetworkManager()));
+        this.directPeripheralTester = new DirectPeripheralTester(context, hardwareManager);
+        this.directPcmPlayer = new DirectPcmPlayer();
+        this.directWebSocketTransport.setPeripheralTester(directPeripheralTester);
+        this.directWebSocketTransport.setPcmPlayer(directPcmPlayer);
+        this.directWebSocketTransport.setTestSoundPlayer(() -> {
+            if (!hardwareManager.supportsAudioPlayback()) return false;
+            hardwareManager.playAudioAsset(AudioAssets.CLICK_SOUND);
+            return true;
+        });
+        K900CommandHandler.setDirectPeripheralTester(directPeripheralTester);
 
         this.streamingManager = new MediaManager(context, serviceManager);
 
@@ -161,6 +189,7 @@ public class ServiceContainer {
 
         // Initialize lifecycle manager first
         lifecycleManager.initialize();
+        directWebSocketTransport.start();
 
         // Wire up phone-controlled OTA after OtaService has started (delayed)
         new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
@@ -204,6 +233,10 @@ public class ServiceContainer {
 
         // Clean up streaming manager first (unregisters callbacks)
         streamingManager.cleanup();
+        directWebSocketTransport.stop();
+        directPcmPlayer.close();
+        directPeripheralTester.close();
+        K900CommandHandler.setDirectPeripheralTester(null);
 
         // Clean up lifecycle manager
         lifecycleManager.cleanup();

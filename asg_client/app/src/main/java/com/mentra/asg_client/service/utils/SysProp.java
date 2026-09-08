@@ -115,6 +115,13 @@ public class SysProp {
         return get(context, KEY_BES_BT_MAC);
     }
 
+    /** Return the stable Android product serial without requiring a runtime permission. */
+    public static String getDeviceSerial(Context context) {
+        String serial = get(context, "ro.serialno");
+        if (serial.isEmpty()) serial = get(context, "ro.boot.serialno");
+        return serial;
+    }
+
     /**
      * Save the BES BT MAC address to system properties (persistent)
      * @param context Application context
@@ -124,4 +131,3 @@ public class SysProp {
         set(context, KEY_BES_BT_MAC, mac);
     }
 }
-

@@ -6,6 +6,7 @@ plugins {
 }
 
 // 1. Import classes for file/stream and properties
+import groovy.json.JsonOutput
 import java.util.Properties
 
 // 2. Create a Properties object and load from .env if present
@@ -17,6 +18,20 @@ if (envFile.exists()) {
 } else {
     logger.warn(".env file not found at ${envFile}")
 }
+
+// Direct Cally values come from Gradle, process environment, or the ignored .env file.
+// JsonOutput produces escaped Java string literals without logging credentials.
+def resolveDirectSetting = { String key, String fallback ->
+    def value = project.findProperty(key) ?: System.getenv(key) ?: envProperties[key]
+    return value == null ? fallback : value.toString()
+}
+def callyDirectMode = resolveDirectSetting("CALLY_DIRECT_MODE", "disabled")
+def callyDirectUrl = resolveDirectSetting("CALLY_DIRECT_URL", "")
+def callyDirectDeviceToken = resolveDirectSetting("CALLY_DIRECT_DEVICE_TOKEN", "")
+def callyDirectCloudflareAccessClientId = resolveDirectSetting("CALLY_DIRECT_CF_ACCESS_CLIENT_ID", "")
+def callyDirectCloudflareAccessClientSecret = resolveDirectSetting("CALLY_DIRECT_CF_ACCESS_CLIENT_SECRET", "")
+def callyDirectAllowCleartextDebug = resolveDirectSetting("CALLY_DIRECT_ALLOW_CLEARTEXT_DEBUG", "false")
+        .trim().equalsIgnoreCase("true")
 
 /**
  * Release signing credentials from environment variables
@@ -209,6 +224,14 @@ android {
         buildConfigField "String", "MENTRAOS_HOST", "\"${envProperties['MENTRAOS_HOST'] ?: ""}\""
         buildConfigField "String", "MENTRAOS_PORT", "\"${envProperties['MENTRAOS_PORT'] ?: ""}\""
         buildConfigField "String", "MENTRAOS_SECURE", "\"${envProperties['MENTRAOS_SECURE'] ?: ""}\""
+
+        buildConfigField "String", "CALLY_DIRECT_MODE", JsonOutput.toJson(callyDirectMode)
+        buildConfigField "boolean", "CALLY_BUTTON_INPUT_ENABLED", resolveDirectSetting("CALLY_BUTTON_INPUT_ENABLED", "false").toBoolean().toString()
+        buildConfigField "String", "CALLY_DIRECT_URL", JsonOutput.toJson(callyDirectUrl)
+        buildConfigField "String", "CALLY_DIRECT_DEVICE_TOKEN", JsonOutput.toJson(callyDirectDeviceToken)
+        buildConfigField "String", "CALLY_DIRECT_CF_ACCESS_CLIENT_ID", JsonOutput.toJson(callyDirectCloudflareAccessClientId)
+        buildConfigField "String", "CALLY_DIRECT_CF_ACCESS_CLIENT_SECRET", JsonOutput.toJson(callyDirectCloudflareAccessClientSecret)
+        buildConfigField "boolean", "CALLY_DIRECT_ALLOW_CLEARTEXT_DEBUG", callyDirectAllowCleartextDebug.toString()
 
         // Sentry configuration
         buildConfigField "String", "SENTRY_DSN", "\"${envProperties['SENTRY_DSN'] ?: ""}\""

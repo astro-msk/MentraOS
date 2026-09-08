@@ -332,6 +332,13 @@ public class OtaService extends Service {
         try {
             OtaSessionManager sessionManager = new OtaSessionManager(this);
 
+            if (!OtaConstants.ASG_PACKAGE.equals(getPackageName())) {
+                sessionManager.clear();
+                sessionManager.consumePendingApkStatus();
+                Log.i(TAG, "Stock OTA resume disabled in custom builds");
+                return;
+            }
+
             if (sessionManager.hasActiveSession() && sessionManager.isInRestartGuard()) {
                 Log.i(TAG, "📱 Active OTA session found in restart guard - auto-continuing");
                 long waitMs = sessionManager.getRestartGuardRemainingMs();

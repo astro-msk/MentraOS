@@ -5,6 +5,7 @@ package com.mentra.asg_client.io.ota.utils;
  */
 public class OtaConstants {
     public static final String TAG = "ASGClientOTA";
+    public static final String ASG_PACKAGE = "com.mentra.asg_client";
 
     // URLs
     // Production OTA version JSON URL for ASG client 39+.

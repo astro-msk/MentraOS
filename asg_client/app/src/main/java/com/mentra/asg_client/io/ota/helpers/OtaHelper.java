@@ -484,6 +484,14 @@ public class OtaHelper {
      * Start OTA update from phone command using a caller-supplied version JSON URL when provided.
      */
     public void startOtaFromPhone(String versionJsonUrl) {
+        // A stock OTA would install the production package alongside a custom build and can
+        // replace its runtime state. Custom builds are updated explicitly through ADB instead.
+        if (!OtaConstants.ASG_PACKAGE.equals(context.getPackageName())) {
+            sendOtaStartAck();
+            sendProgressToPhone("download", 0, 0, 0, "FAILED", "stock_ota_disabled");
+            Log.i(TAG, "Stock OTA request rejected in custom build");
+            return;
+        }
         String requestedVersionJsonUrl = resolveVersionJsonUrl(versionJsonUrl);
         Log.i(TAG, "📱 Starting OTA from phone request");
 
