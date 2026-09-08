@@ -26,12 +26,13 @@ The authenticated protocol provides:
 | --- | --- |
 | Status and heartbeat | Device identity, battery, network, process session, and connection health |
 | Ping | WebSocket round-trip test |
-| Camera | Privacy-LED capture at the sensor `high` profile, currently 1920×1440 JPEG at quality 85, with the original JPEG sent without recompression and a 1 MiB media limit |
+| Camera | Privacy-LED capture at the sensor `high` profile (resolution depends on supported sensor outputs), original JPEG without recompression, 1 MiB limit, and audible shutter after capture |
+| Short video | Five seconds at the 720p profile, H.264/AAC MP4, visible indicator, bounded camera waits, and 8 MiB limit |
 | Voice | A bounded 16 kHz mono PCM recording with energy-based endpoint detection |
 | Microphone diagnostic | A fixed two-second 16 kHz mono PCM recording |
 | Speaker | Ordered 24 kHz mono PCM streaming with sequence checks, backpressure, and about 43 seconds of bounded buffering |
 | LED | Two short green RGB pulses |
-| Buttons | Process-local camera-button count, last press type, and timestamp; existing phone/gallery behavior is preserved |
+| Buttons | Direct builds reserve right short press for photo and right long press for voice. Stock builds retain phone/gallery behavior. The power button remains available for its original function. |
 
 Camera and microphone operations reject overlap, run outside the WebSocket callback, and release
 their resources on completion or failure. Camera files live in the app cache and are deleted after
@@ -61,3 +62,46 @@ gateway logic.
 
 USB is required for APK installation and local ADB diagnostics. It is not in the runtime path between
 the glasses and Cally.
+
+## Conversation and playback update
+
+PCM completion now waits for the final playback-head frame before releasing AudioTrack and I2S.
+Zero-byte writes during speaker startup are retried with a bounded stall timeout. Short replies are
+primed with silence, and a short silent tail keeps the route open beyond the final audible sample.
+The `speech_end` response acknowledges drained playback, rather than accepting queued data. The
+gateway waits for this acknowledgement in an owned background task so Hermes' ten-second synthesis
+finalization timeout cannot cut off a longer queued reply. Completion clicks are suppressed during
+speech. Whole-file Hermes TTS and text/photo replies have a PCM fallback delivery path.
+
+Cally's configured toolsets now apply to the glasses, including Spotify, terminal, memory, skills,
+and scheduling. Only workflow-preview tools remain sandbox drafts. A voice request can invoke
+`cally_capture` for a fresh photo or five-second video. The gateway returns an immutable media path
+and queues it for the configured Discord history channel.
+
+After a physical voice start, `followup_enabled` permits another audible listening cue after each
+completed spoken reply. The session stops on silence or an end-conversation command, with a maximum
+of ten follow-up turns or five minutes. It is turn-based listening, not simultaneous open-mic
+barge-in. The same `glasses` conversation identifier retains context across those turns.
+
+Additional controls are exposed through `cally_controls`:
+
+- Repeat the last answer.
+- Stop the current speaker stream (also available from Discord).
+- Read live battery and Wi-Fi status.
+- Remember a brief or detailed response preference.
+- End follow-up listening.
+
+The camera tool plus the existing vision tools supports "read this aloud", "translate this", and
+"what am I looking at". Discord free-response configuration enables text chat in `glasses-cally`.
+Discord and glasses use their normal Hermes sessions; this does not merge their full transcripts.
+
+Device regression evidence: 0.792-second and 9.744-second PCM replies both reached their final
+playback frames; the longer reply contained 58 chunks. An MP4 capture decoded with video and audio
+tracks and a duration of 4.971 seconds. Automated follow-up tests verify that listening is not armed
+before playback acknowledgement. Human conversation and perceived audio quality still require use
+of the device; a successful frame drain is not an acoustic measurement.
+
+Custom-build bootstrap wakes and resumes its activity before starting the microphone foreground
+service. Package-replacement startup was verified with Android reporting
+`allowWhileInUsePermissionInFgs=true`; a subsequent test while Android slept opened the microphone
+and ended normally with `no_speech_detected` after 4.32 seconds.

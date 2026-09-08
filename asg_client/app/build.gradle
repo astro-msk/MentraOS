@@ -207,8 +207,12 @@ android {
 
         minSdk 28
         targetSdk 33
-        versionCode 39
-        versionName "39.0"
+        // Custom builds must upgrade the installed Cally APK instead of inheriting
+        // the stock version. CI can pin this value for a reproducible release.
+        def directVersion = resolveDirectSetting("CALLY_DIRECT_VERSION_CODE",
+                (System.currentTimeMillis() / 1000L).longValue().toString()).toInteger()
+        versionCode callyDirectMode == "enabled" ? directVersion : 39
+        versionName callyDirectMode == "enabled" ? "${directVersion}-cally" : "39.0"
 
         ndk {
             abiFilters "armeabi-v7a", "arm64-v8a"

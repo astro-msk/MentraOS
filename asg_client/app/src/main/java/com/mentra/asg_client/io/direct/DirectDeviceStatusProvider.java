@@ -2,6 +2,9 @@ package com.mentra.asg_client.io.direct;
 
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.os.BatteryManager;
+import android.net.ConnectivityManager;
+import android.net.NetworkCapabilities;
 import android.net.wifi.WifiInfo;
 import android.net.wifi.WifiManager;
 import android.os.Build;
@@ -104,7 +107,12 @@ public final class DirectDeviceStatusProvider {
 
     private int safeBatteryLevel() {
         try {
-            return mStateManager == null ? -1 : mStateManager.getBatteryLevel();
+            int cached = mStateManager == null ? -1 : mStateManager.getBatteryLevel();
+            if (cached >= 0) return cached;
+            BatteryManager battery = (BatteryManager) mContext.getSystemService(Context.BATTERY_SERVICE);
+            if (battery == null) return -1;
+            int level = battery.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY);
+            return level >= 0 && level <= 100 ? level : -1;
         } catch (RuntimeException e) {
             Log.w("DirectDeviceStatus", "Unable to read cached battery level", e);
             return -1;
@@ -122,7 +130,11 @@ public final class DirectDeviceStatusProvider {
 
     private boolean safeIsWifiConnected() {
         try {
-            return mNetworkManager != null && mNetworkManager.isConnectedToWifi();
+            if (mNetworkManager != null) return mNetworkManager.isConnectedToWifi();
+            ConnectivityManager connectivity = (ConnectivityManager) mContext.getSystemService(Context.CONNECTIVITY_SERVICE);
+            NetworkCapabilities capabilities = connectivity == null ? null
+                    : connectivity.getNetworkCapabilities(connectivity.getActiveNetwork());
+            return capabilities != null && capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI);
         } catch (RuntimeException e) {
             Log.w("DirectDeviceStatus", "Unable to read Wi-Fi state", e);
             return false;
@@ -131,7 +143,9 @@ public final class DirectDeviceStatusProvider {
 
     private String safeWifiSsid() {
         try {
-            String ssid = mNetworkManager == null ? "" : mNetworkManager.getCurrentWifiSsid();
+            WifiManager wifi = (WifiManager) mContext.getSystemService(Context.WIFI_SERVICE);
+            String ssid = mNetworkManager != null ? mNetworkManager.getCurrentWifiSsid()
+                    : wifi == null || wifi.getConnectionInfo() == null ? "" : wifi.getConnectionInfo().getSSID();
             if (ssid == null || "<unknown ssid>".equalsIgnoreCase(ssid)) {
                 return "";
             }
@@ -144,7 +158,11 @@ public final class DirectDeviceStatusProvider {
 
     private String safeLocalIp() {
         try {
-            String localIp = mNetworkManager == null ? "" : mNetworkManager.getLocalIpAddress();
+            WifiManager wifi = (WifiManager) mContext.getSystemService(Context.WIFI_SERVICE);
+            int address = wifi == null || wifi.getConnectionInfo() == null ? 0 : wifi.getConnectionInfo().getIpAddress();
+            String localIp = mNetworkManager != null ? mNetworkManager.getLocalIpAddress()
+                    : address == 0 ? "" : (address & 255) + "." + ((address >> 8) & 255)
+                    + "." + ((address >> 16) & 255) + "." + ((address >> 24) & 255);
             return localIp == null ? "" : localIp;
         } catch (RuntimeException e) {
             Log.w("DirectDeviceStatus", "Unable to read local IP address", e);

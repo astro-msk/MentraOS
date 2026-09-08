@@ -7,6 +7,8 @@ import android.media.AudioRecord;
 import android.media.MediaRecorder;
 import android.os.SystemClock;
 import android.util.Base64;
+import com.mentra.asg_client.audio.AudioAssets;
+import com.mentra.asg_client.settings.VideoSettings;
 import com.mentra.asg_client.AsgConstants;
 import com.mentra.asg_client.camera.CameraNeoService;
 import com.mentra.asg_client.io.hardware.interfaces.IHardwareManager;
@@ -19,6 +21,9 @@ import java.util.Arrays;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.UUID;
 import java.util.function.Consumer;
 import org.json.JSONObject;
 
@@ -72,6 +77,8 @@ public final class DirectPeripheralTester {
                     finish(reply, result(kind, false, "streaming_active"));
                 } else if ("photo".equals(kind)) {
                     capturePhoto(reply);
+                } else if ("video".equals(kind)) {
+                    recordVideo(reply);
                 } else if ("voice".equals(kind)) {
                     recordVoice(reply);
                 } else if ("mic".equals(kind)) {
@@ -80,7 +87,11 @@ public final class DirectPeripheralTester {
                     finish(reply, result(kind, false, "unsupported"));
                 }
             } catch (Exception error) {
-                finish(reply, result(kind, false, error.getClass().getSimpleName()));
+                String code = error.getMessage();
+                // Preserve our bounded semantic codes (especially silence), without
+                // returning arbitrary platform exception details or file paths.
+                if (code == null || !code.matches("[a-z_]{1,64}")) code = error.getClass().getSimpleName();
+                finish(reply, result(kind, false, code));
             }
         });
     }
@@ -94,6 +105,7 @@ public final class DirectPeripheralTester {
                 true, null, new CameraNeoService.PhotoCaptureCallback() {
             @Override public void onPhotoCaptured(String path) {
                 if (mClosed) { target.delete(); mBusy.set(false); return; }
+                if (mHardware.supportsAudioPlayback()) mHardware.playAudioAsset(AudioAssets.CAMERA_SOUND);
                 mWorker.execute(() -> {
                     try {
                         byte[] bytes = Files.readAllBytes(new File(path).toPath());
@@ -152,6 +164,54 @@ public final class DirectPeripheralTester {
         }
     }
 
+    /** Record a user-requested five-second clip with bounded waiting and output size. */
+    private void recordVideo(Consumer<JSONObject> reply) throws Exception {
+        long cameraDeadline = SystemClock.elapsedRealtime() + 1500;
+        while (CameraNeoService.isCameraInUse() && SystemClock.elapsedRealtime() < cameraDeadline)
+            Thread.sleep(50);
+        if (CameraNeoService.isCameraInUse()) throw new IllegalStateException("camera_busy");
+        File target = File.createTempFile("cally-video-", ".mp4", mContext.getCacheDir());
+        String id = "cally-" + UUID.randomUUID();
+        CountDownLatch started = new CountDownLatch(1), stopped = new CountDownLatch(1);
+        AtomicBoolean failed = new AtomicBoolean(), expired = new AtomicBoolean();
+        try {
+            if (!mHardware.supportsRgbLed()) throw new IllegalStateException("capture_indicator_unavailable");
+            mHardware.setRgbLedOn(1, 30000, 0, 1, AsgConstants.DIRECT_TEST_LED_BRIGHTNESS);
+            CameraNeoService.startVideoRecording(mContext, id, target.getAbsolutePath(),
+                    VideoSettings.get720p(), new CameraNeoService.VideoRecordingCallback() {
+                @Override public void onRecordingStarted(String videoId) {
+                    if (expired.get()) CameraNeoService.stopVideoRecording(mContext, id);
+                    started.countDown();
+                }
+                @Override public void onRecordingProgress(String videoId, long durationMs) {}
+                @Override public void onRecordingStopped(String videoId, String path) {
+                    if (mHardware.supportsRgbLed()) mHardware.setRgbLedOff();
+                    if (expired.get()) target.delete();
+                    stopped.countDown();
+                }
+                @Override public void onRecordingError(String videoId, String error) {
+                    if (mHardware.supportsRgbLed()) mHardware.setRgbLedOff();
+                    failed.set(true); started.countDown(); stopped.countDown();
+                }
+            });
+            if (!started.await(8, TimeUnit.SECONDS) || failed.get())
+                throw new IllegalStateException("video_start_failed");
+            Thread.sleep(5000);
+            CameraNeoService.stopVideoRecording(mContext, id);
+            if (!stopped.await(8, TimeUnit.SECONDS) || failed.get())
+                throw new IllegalStateException("video_stop_failed");
+            if (target.length() == 0 || target.length() > 8 * 1024 * 1024)
+                throw new IllegalStateException("video_size_invalid");
+            JSONObject response = mediaResult("video", "video/mp4", Files.readAllBytes(target.toPath()));
+            finish(reply, response);
+        } finally {
+            expired.set(true);
+            CameraNeoService.stopVideoRecording(mContext, id);
+            target.delete();
+            if (stopped.getCount() == 0 && mHardware.supportsRgbLed()) mHardware.setRgbLedOff();
+        }
+    }
+
     private void recordVoice(Consumer<JSONObject> reply) throws Exception {
         int rate = AsgConstants.DIRECT_TEST_AUDIO_RATE;
         int minimum = AudioRecord.getMinBufferSize(rate, AudioFormat.CHANNEL_IN_MONO,
@@ -191,7 +251,7 @@ public final class DirectPeripheralTester {
     }
 
     private JSONObject mediaResult(String kind, String mime, byte[] bytes) throws Exception {
-        if (bytes.length > ("voice".equals(kind) ? AsgConstants.DIRECT_VOICE_MEDIA_MAX_BYTES : AsgConstants.DIRECT_TEST_MEDIA_MAX_BYTES))
+        if (bytes.length > ("video".equals(kind) ? 8 * 1024 * 1024 : "voice".equals(kind) ? AsgConstants.DIRECT_VOICE_MEDIA_MAX_BYTES : AsgConstants.DIRECT_TEST_MEDIA_MAX_BYTES))
             throw new IllegalStateException("media_too_large");
         return result(kind, true, null).put("mimeType", mime).put("bytes", bytes.length)
                 .put("base64", Base64.encodeToString(bytes, Base64.NO_WRAP));

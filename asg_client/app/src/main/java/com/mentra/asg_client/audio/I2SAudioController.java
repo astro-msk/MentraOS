@@ -55,7 +55,7 @@ public class I2SAudioController {
             mediaPlayer.setAudioStreamType(AudioManager.STREAM_NOTIFICATION);
 
             // Set volume to maximum for this stream to ensure audio is audible
-            mediaPlayer.setVolume(0.1f, 0.1f);
+            mediaPlayer.setVolume(1.0f, 1.0f);
 
             mediaPlayer.setDataSource(afd.getFileDescriptor(), afd.getStartOffset(), afd.getLength());
             afd.close();

@@ -435,9 +435,20 @@ public final class DirectWebSocketTransport {
                         break;
                     case SPEECH_END:
                         boolean ended = mPcmPlayer != null
-                                && mPcmPlayer.finish(command.mPayload.getString("streamId"));
-                        sendEnvelopeLocked("speech_result", command.mRequestId,
-                                new JSONObject().put("accepted", ended).put("phase", "end"));
+                                && mPcmPlayer.finish(command.mPayload.getString("streamId"), drained -> {
+                                    synchronized (mLock) {
+                                        if (isCurrentCallbackLocked(generation, webSocket) && mProtocolReady) {
+                                            try {
+                                                sendEnvelopeLocked("speech_result", command.mRequestId,
+                                                        new JSONObject().put("accepted", drained).put("phase", "end"));
+                                            } catch (org.json.JSONException error) {
+                                                Log.e("DirectWebSocket", "Cannot report playback completion", error);
+                                            }
+                                        }
+                                    }
+                                });
+                        if (!ended) sendEnvelopeLocked("speech_result", command.mRequestId,
+                                new JSONObject().put("accepted", false).put("phase", "end"));
                         break;
                     case SPEECH_ABORT:
                         if (mPcmPlayer != null) {
@@ -446,6 +457,7 @@ public final class DirectWebSocketTransport {
                         break;
                     case TEST_LED:
                     case TEST_PHOTO:
+                    case TEST_VIDEO:
                     case TEST_VOICE:
                     case TEST_MIC:
                     case TEST_BUTTONS:
@@ -728,7 +740,7 @@ public final class DirectWebSocketTransport {
             validateEmptyPayload(message);
             return new InboundCommand(InboundType.PING, requestId);
         }
-        if ("test_led".equals(type) || "test_photo".equals(type)
+        if ("test_led".equals(type) || "test_photo".equals(type) || "test_video".equals(type)
                 || "test_voice".equals(type) || "test_mic".equals(type) || "test_buttons".equals(type)) {
             validateEmptyPayload(message);
             if (requestId == null) throw new JSONException("test requires requestId");
@@ -886,6 +898,7 @@ public final class DirectWebSocketTransport {
         SPEECH_ABORT,
         TEST_LED,
         TEST_PHOTO,
+        TEST_VIDEO,
         TEST_VOICE,
         TEST_MIC,
         TEST_BUTTONS,

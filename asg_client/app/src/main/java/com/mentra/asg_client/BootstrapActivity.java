@@ -25,6 +25,13 @@ public class BootstrapActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         try {
             super.onCreate(savedInstanceState);
+            if (com.mentra.asg_client.io.direct.DirectServerConfig.fromBuildConfig().isEnabled()) {
+                // A partial wake lock keeps the CPU running but does not make this
+                // activity foreground. Android 11 otherwise starts the microphone
+                // service with allowWhileInUsePermissionInFgs=false after an update.
+                setShowWhenLocked(true);
+                setTurnScreenOn(true);
+            }
             Log.e(TAG, "BootstrapActivity onCreate - preparing to start AsgClientService");
             
             // Log boot information for debugging

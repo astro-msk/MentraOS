@@ -815,7 +815,11 @@ public class K900CommandHandler {
      */
     private void handleConfigurableButtonPress(boolean isLongPress) {
         DirectPeripheralTester tester = directPeripheralTester;
-        if (tester != null) tester.onButton(isLongPress);
+        if (tester != null) {
+            tester.onButton(isLongPress);
+            // Cally owns photo/voice capture for explicitly enabled direct builds.
+            if (com.mentra.asg_client.io.direct.DirectServerConfig.fromBuildConfig().isEnabled()) return;
+        }
         if (serviceManager != null && serviceManager.getAsgSettings() != null) {
             String pressType = isLongPress ? "long" : "short";
             Log.d(TAG, "Handling " + pressType + " button press");
